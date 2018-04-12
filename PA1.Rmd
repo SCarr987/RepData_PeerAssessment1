@@ -1,0 +1,182 @@
+---
+title: "Analysis of Steps from Activity Monitoring Device"
+subtitle: "Reproducible Research: Peer Assessment 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(data.table))
+suppressWarnings(library(lubridate))
+                 
+```
+
+```{r packagesetup}
+# packages 
+library(ggplot2)
+library(data.table)
+library(lubridate)
+
+```
+
+# Loading and Preprocessing the Data
+Show any code that is needed to:
+
+Load the data (i.e. read.csv())  
+Process/transform the data (if necessary) into a format suitable for your analysis
+
+```{r load}
+# Load the datafile quickly and return a data table
+activity <- fread('./data/activity.csv')
+
+```
+
+# What is the total number of steps taken per day?
+For this part of the assignment, you can ignore the missing values in the dataset.
+
+1. Calculate the total number of steps taken per day
+2. If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+3. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r 1-MeanStepsPerDayNoNA}
+# Make a copy of the data without NA's
+actdata <- activity[!is.na(activity$steps),]   # strip the NA's
+
+## Find the sum per day
+totsteps <- tapply(actdata$steps,actdata$date,sum) 
+
+## Display histogram, mean and median 
+hist(totsteps, col = 'lightblue', 
+      main = 'Activity Monitoring Device \nDaily Steps', xlab = 'Total Number of Steps', ylab = 'Frequency')
+      abline(v=mean(totsteps), col = 'blue', lty = 1)     
+      abline(v=median(totsteps), col = 'darkblue', lty=3)  
+      mtext(expression(italic('NA removed ')), side = 3, adj = 1, line = -4)
+
+      legend('topright', legend = c('mean','median'), 
+             col = c('blue', 'darkblue'),  lty = c(1,3))
+      
+## Capture mean and median
+meanNoNA <-  as.character(round(mean(totsteps),0))
+mediNoNA <-  as.character(round(median(totsteps),0))
+
+```
+ 
+The mean and median of the total number of steps taken per day are `r meanNoNA` and `r mediNoNA`, respectively. 
+ 
+ 
+ 
+ 
+#What is the average daily activity pattern?
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r 2-avedailypatternnoNA}
+intsteps <- tapply(actdata$steps,actdata$interval,mean) # find average per interval
+plot(names(intsteps),intsteps, type = 'l',
+      main = 'Activity Monitoring Device \nSteps at Time Interval', xlab = 'Time Interval (HHMM)', ylab = 'Average Steps')
+
+      timemax <- names(intsteps[which.max(intsteps)])
+      valmax <- round(max(intsteps),0)   
+     
+      ## Enhance readability of text comments
+      mtext(c(paste('maximum:',valmax,'steps at ',timemax,'time ')), side = 3, adj = 1, line = -2)
+      mtext(expression(italic('NA removed ')), side = 3, adj = 1, line = -4)
+
+```
+
+The maximum number of steps in a 5-minute interval is `r valmax`, which occurred at the `r timemax` interval. 
+
+# Imputing missing values
+Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+First, explore the data to see if there is a pattern to the missing NA that might adversely affect the data. 
+
+```{r 3-1-MeanStepsPerDayImpute}
+## Explore data
+      numNA <- sum(is.na(activity$steps))   #2304
+      ## look for patterns in missing data prior to imputing missing values
+      actdata <- activity[is.na(activity$steps),]
+      tabNA <- table(actdata$date)   # eight dates are missing data, 24*60/5 = 288 measurements
+```
+Note that there are `r numNA` missing values for step data.  These occur for dates: `r unique(actdata$date)`. There number of missing values associated with each date are: `r table(actdata$date)` Other than missing all data for an entire day, there are no other patterns. 
+
+
+Next, choose to fill missing values with the overall 5 minute interval mean, and recalculate the dataset. Show data, as before, with a histogram. 
+```{r 3-2-MeanStepsPerDayImpute}
+## Create new dataset with imputed values from mean for 5 minute interval
+      actimp <- activity # copy initial dataset since small number of na
+
+      ## Replace NA by row with means found in part 2
+      for (i in 1:nrow(actimp)) {
+            if(is.na(actimp$steps[i])) {
+                  actimp$steps[i] <- intsteps[which(actimp$interval[i]==as.numeric(names(intsteps)))]
+            }
+      }
+      
+      ## Recalculate data with imputed information
+      totsteps <- tapply(actimp$steps,actimp$date,sum) # find sum per day
+      
+      
+## Display histogram, mean and median 
+      hist(totsteps, col = 'lightgreen', 
+           main = 'Activity Monitoring Device \nDaily Steps', 
+           xlab = 'Total Number of Steps', ylab = 'Frequency')
+            abline(v=mean(totsteps), col = 'blue', lty = 1)     
+            abline(v=median(totsteps), col = 'darkblue', lty=3) 
+            mtext(expression(italic('NA imputed ')), side = 3, adj = 1, line = -4)
+      
+      legend('topright', legend = c('mean','median'), 
+             col = c('blue', 'darkblue'),  lty = c(1,3))    
+      
+ ## Capture median and mean
+      meanimp <- as.character(round(mean(totsteps),0))
+      mediimp <- as.character(round(median(totsteps),0))     
+      
+```
+The mean and median with NA's removed were `r meanNoNA` and `r mediNoNA`, respectively.  After imputing, the mean and median of the recalculated dataset are`r meanimp` and `r mediimp`, respectively.  These values are not changed. 
+
+
+
+#Are there differences in activity patterns between weekdays and weekends?
+For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+1. Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+
+```{r 4-WeekendVWeekday}
+## Add a factor column for type of day - weekend or weekday
+      ##  transform date to posix
+      actimp$date <- ymd(actimp$date)
+      
+      ## logic to categorize days - Sat and Sun begin with S
+      daytype <- function(x) {if(substr(weekdays(x),1,1)=="S")  'weekend' else 'weekday' }
+      
+      ## add the factor column for type of day 
+      actimp$dayt <- as.factor(sapply(actimp$date, daytype))
+      
+      ## make a time series of the data comparing weekend and weekday 
+      totsteps <- aggregate(steps ~ interval+dayt, actimp, mean)
+ 
+## Make a panel plot compring weekday to weekend          
+      plt <- ggplot(totsteps, aes(interval, steps)) +
+            geom_line(stat = "identity", aes(colour = dayt)) +
+            theme_gray() +
+            facet_grid(dayt ~ ., scales="fixed", space="fixed") +
+            labs(x="Time Interval (HHMM)", y=expression("Average Number of Steps")) +
+            ggtitle("Activity Monitoring Device Daily Steps")
+      print(plt)  
+      
+## Calcuate mean steps for each case
+      meansteps <- tapply(actimp$steps,actimp$dayt,mean)    
+      meanweekday <- round(as.numeric(meansteps[1]),0)
+      meanweekend <- round(as.numeric(meansteps[2]),0)
+```
+The graphs show that during the week, there are a lot more steps in the morning, within about 2 hours of 8 am, and smaller bursts of activity during the rest of the day.  On the weekend, however, the frequency of steps during waking hours are more consistent. 
+
+On average, `r meanweekend` steps are taken on the weekend. In contrast, fewer average steps are taken on a weekday, `r meanweekday`.  
